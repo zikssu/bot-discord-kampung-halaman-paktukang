@@ -1,1 +1,0 @@
-# bot-discord-kampung-halaman-paktukang-python
