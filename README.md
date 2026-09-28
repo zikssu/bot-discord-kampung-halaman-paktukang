@@ -113,6 +113,7 @@ Buat file `.env` di direktori yang sama dengan `main.py`:
 
 ``` env
 DISCORD_TOKEN=isi_token_bot_anda
+DISCORD_APPLICATION_ID=isi_id_bot
 DISCORD_GUILD_ID=id_server_discord
 ```
 
