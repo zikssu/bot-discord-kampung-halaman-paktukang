@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+BANNER_URL= "https://cdn.discordapp.com/attachments/1545650023793041439/1553221942981558312/banner-server-discord-Kampung-Halaman-Garis.png?ex=6abb1928&is=6ab9c7a8&hm=3c2352b28839311353fab815a8f03d7f4cbbd078e86868ff24c72d17b7873531"
+
 from bot.store import read, write
 
 
@@ -39,7 +41,7 @@ class SaranModal(discord.ui.Modal):
 
         if not value:
             return await i.response.send_message(
-                "❌ Kritik atau saran tidak boleh kosong.",
+                "❌ Kritik atau Saran tidak boleh kosong.",
                 ephemeral=True
             )
 
@@ -393,6 +395,8 @@ class Automasi(commands.Cog):
             color=0xffffff
         )
 
+        e.set_image(url=BANNER_URL)
+
         e.set_footer(
             text="Pak Tukang | Layanan Kritik & Saran"
         )
@@ -472,7 +476,6 @@ class Automasi(commands.Cog):
                     f"Gagal menambahkan reaksi "
                     f"{emoji}: {ex}"
                 )
-
 
 # =========================================================
 # SETUP EXTENSION
