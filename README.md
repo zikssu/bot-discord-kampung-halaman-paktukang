@@ -258,6 +258,7 @@ sinkronisasi command.
 
 ## Lisensi
 
-Belum ada lisensi yang ditentukan dalam berkas proyek. Tambahkan file
+Proyek ini dilisensikan di bawah
+[MIT License](LICENSE).
 `LICENSE` jika ingin menetapkan ketentuan penggunaan, modifikasi, dan
 distribusi.
