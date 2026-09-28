@@ -255,10 +255,3 @@ Pola umum: 1. Buat class Cog. 2. Definisikan slash command dengan
 menggunakan `await bot.add_cog(...)`. 4. Tambahkan nama modul ke daftar
 ekstensi di `bot/loader.py`. 5. Jalankan ulang bot dan verifikasi
 sinkronisasi command.
-
-## Lisensi
-
-Proyek ini dilisensikan di bawah
-[MIT License](LICENSE).
-`LICENSE` jika ingin menetapkan ketentuan penggunaan, modifikasi, dan
-distribusi.
