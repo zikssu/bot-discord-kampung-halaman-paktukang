@@ -742,9 +742,15 @@ Penyimpanan JSON cocok untuk proyek kecil hingga menengah dan konfigurasi sederh
 
 ## 📄 Lisensi
 
-Belum terdapat file lisensi khusus pada proyek ini.
+Proyek ini sudah memiliki file **`LICENSE`** pada repository.
 
-Jika proyek akan dipublikasikan sebagai open-source, tentukan lisensi yang sesuai dan tambahkan file `LICENSE` pada root repository.
+Untuk mengetahui ketentuan penggunaan, penyalinan, modifikasi, dan distribusi proyek secara lengkap, silakan merujuk langsung ke:
+
+```text
+LICENSE
+```
+
+> ⚖️ **Catatan:** Ketentuan yang berlaku adalah ketentuan yang tercantum di dalam file `LICENSE` pada repository ini.
 
 ---
 
