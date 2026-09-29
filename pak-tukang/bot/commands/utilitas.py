@@ -26,4 +26,3 @@ class Utilitas(commands.Cog):
         if m and m.joined_at: s+=f"\n**Bergabung ke server:** <t:{int(m.joined_at.timestamp())}:D>"
         await i.response.send_message(s,ephemeral=True)
 async def setup(bot): await bot.add_cog(Utilitas(bot))
-
