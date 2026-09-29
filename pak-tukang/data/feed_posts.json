@@ -1,1 +1,48 @@
-[]
+[
+  {
+    "id": "1e767c8c2b",
+    "guild_id": "1545641529928851506",
+    "channel_id": "1554117923964977172",
+    "message_id": "1554537237906198610",
+    "thread_id": "1554537237906198610",
+    "thread_url": "https://discord.com/channels/1545641529928851506/1554537237906198610",
+    "author_id": "1504756104406634567",
+    "author_name": "ziks",
+    "author_avatar": "https://cdn.discordapp.com/avatars/1504756104406634567/3d02193960d5ae03d7eb0bf0f048e0c0.png?size=1024",
+    "title": "Awwaw",
+    "caption": "AWAwawa",
+    "category": "Berita & Informasi",
+    "emoji": "📰",
+    "media_urls": [],
+    "media_url": null,
+    "media_type": null,
+    "link_platform": null,
+    "created_at": "2026-09-29T16:55:58.233897+00:00",
+    "likes": [],
+    "dislikes": []
+  },
+  {
+    "id": "8b9c9f0cc6",
+    "guild_id": "1545641529928851506",
+    "channel_id": "1554117923964977172",
+    "message_id": "1554537298048065546",
+    "thread_id": "1554537298048065546",
+    "thread_url": "https://discord.com/channels/1545641529928851506/1554537298048065546",
+    "author_id": "1504756104406634567",
+    "author_name": "ziks",
+    "author_avatar": "https://cdn.discordapp.com/avatars/1504756104406634567/3d02193960d5ae03d7eb0bf0f048e0c0.png?size=1024",
+    "title": "Awwawawa",
+    "caption": "AWAwawawa",
+    "category": "Kegiatan",
+    "emoji": "🎉",
+    "media_urls": [],
+    "media_url": null,
+    "media_type": null,
+    "link_platform": null,
+    "created_at": "2026-09-29T16:56:13.264683+00:00",
+    "likes": [
+      "1504756104406634567"
+    ],
+    "dislikes": []
+  }
+]

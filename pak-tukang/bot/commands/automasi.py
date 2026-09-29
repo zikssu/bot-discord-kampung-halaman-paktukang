@@ -240,12 +240,10 @@ def mutual_embed(profile, user=None):
         ),
         color=discord.Color.from_rgb(255, 255, 255),
     )
-    # Nama user tetap ditampilkan sebagai author, sementara avatar user
-    # ditempatkan di sisi kanan embed melalui thumbnail Discord.
+    # Nama user tidak ditampilkan lagi karena user sudah disebut
+    # langsung melalui User Mention pada deskripsi. Avatar tetap
+    # ditampilkan di sisi kanan embed melalui thumbnail Discord.
     avatar_url = profile.get("avatar_url") or None
-    embed.set_author(
-        name=profile.get("display_name", "Warga Kampung Halaman"),
-    )
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
 
