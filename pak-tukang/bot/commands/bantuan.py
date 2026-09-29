@@ -55,16 +55,16 @@ def make_embed(category):
             "- `/infouser` — Informasi Profil pengguna Discord.\n"
             "- `/ping` — Informasi Latensi Bot Pak Tukang."
         )
-
+    
     elif category == "automasi":
         e.description = (
             "# ⚙️ Automasi\n"
             "Fitur untuk mengelola aktivitas Kampung Halaman.\n\n"
             "- `/autothread` — Mengatur Auto Thread.\n"
-            "- `/daftar-autothread` — Informasi Daftar channel "
+            "- `/daftar-autothread` — Informasi daftar channel "
             "yang menggunakan Auto Thread.\n"
-            "- `/setup-saran` — Membuat panel Kritik & Saran."\n
-            "`/setup-feed` — Membuat panel Feed Postingan Warga Otomatis."
+            "- `/setup-saran` — Membuat panel Kritik & Saran.\n"
+            "- `/setup-feed` — Membuat panel Feed Postingan Warga Otomatis."
         )
 
     else:
