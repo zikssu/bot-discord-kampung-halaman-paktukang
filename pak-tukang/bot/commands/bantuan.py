@@ -63,7 +63,8 @@ def make_embed(category):
             "- `/autothread` — Mengatur Auto Thread.\n"
             "- `/daftar-autothread` — Informasi Daftar channel "
             "yang menggunakan Auto Thread.\n"
-            "- `/setup-saran` — Membuat panel Kritik & Saran."
+            "- `/setup-saran` — Membuat panel Kritik & Saran."\n
+            "`/setup-feed` — Membuat panel Feed Postingan Warga Otomatis."
         )
 
     else:
