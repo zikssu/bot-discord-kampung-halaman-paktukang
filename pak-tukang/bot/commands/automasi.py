@@ -8,6 +8,7 @@ from bot.store import read, write
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 import uuid
+import asyncio
 
 
 DEFAULT = "💬 Kolom Komentar"
@@ -459,6 +460,310 @@ class MutualProfileView(discord.ui.View):
 # COG AUTOMASI
 # =========================================================
 
+
+
+# =========================================================
+# KARTU IDENTITAS WARGA (KIW)
+# =========================================================
+
+from io import BytesIO
+from pathlib import Path
+
+KIW_THREAD_NAME = "💬 Kolom Komentar"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+KIW_TEMPLATE_PATH = PROJECT_ROOT / "assets" / "kiw_reference.png"
+
+
+def kiw_cards():
+    return read("kiw.json", [])
+
+
+def save_kiw_cards(data):
+    write("kiw.json", data)
+
+
+def kiw_settings():
+    return read("kiw_settings.json", [])
+
+
+def save_kiw_settings(data):
+    write("kiw_settings.json", data)
+
+
+def render_kiw(data, avatar_bytes):
+    """Render kartu dari template referensi Kampung Halaman menggunakan Pillow."""
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+    if not KIW_TEMPLATE_PATH.exists():
+        raise FileNotFoundError(
+            "Template KIW tidak ditemukan: assets/kiw_reference.png"
+        )
+
+    image = Image.open(KIW_TEMPLATE_PATH).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    width, height = image.size
+    sx, sy = width / 1600, height / 1000
+
+    def xy(box):
+        return tuple(round(v * (sx if idx % 2 == 0 else sy))
+                     for idx, v in enumerate(box))
+
+    def font(size, bold=False):
+        candidates = (
+            ["assets/fonts/Poppins-Bold.ttf", "assets/fonts/DejaVuSans-Bold.ttf"]
+            if bold else
+            ["assets/fonts/Poppins-Regular.ttf", "assets/fonts/DejaVuSans.ttf"]
+        )
+        for candidate in candidates:
+            try:
+                return ImageFont.truetype(candidate, max(10, round(size * sy)))
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    def cover_field(box, text, size=24, bold=False, max_chars=None):
+        x1, y1, x2, y2 = xy(box)
+        # Menutup placeholder tanpa mengubah garis/bingkai kartu.
+        draw.rounded_rectangle(
+            (x1 + 5, y1 + 5, x2 - 5, y2 - 5),
+            radius=max(5, round(12 * sx)),
+            fill=(220, 235, 209, 255),
+        )
+        fnt = font(size, bold)
+        value = str(text or "-").strip() or "-"
+        max_width = x2 - x1 - round(38 * sx)
+        while value and draw.textbbox((0, 0), value, font=fnt)[2] > max_width:
+            value = value[:-2].rstrip() + "…" if len(value) > 2 else "…"
+        bbox = draw.textbbox((0, 0), value, font=fnt)
+        ty = y1 + (y2 - y1 - (bbox[3] - bbox[1])) // 2 - bbox[1]
+        draw.text((x1 + round(24 * sx), ty), value, font=fnt, fill=(20, 48, 42, 255))
+
+    # Nomor KIW pada kapsul kanan atas.
+    x1, y1, x2, y2 = xy((1305, 30, 1490, 89))
+    draw.rounded_rectangle(
+        (x1 + 5, y1 + 4, x2 - 5, y2 - 4),
+        radius=round(25 * sx),
+        fill=(7, 83, 65, 255),
+    )
+    number = data.get("card_number", "KH-00000")
+    fnum = font(27, True)
+    bbox = draw.textbbox((0, 0), number, font=fnum)
+    tx = x1 + ((x2 - x1) - (bbox[2] - bbox[0])) // 2
+    ty = y1 + ((y2 - y1) - (bbox[3] - bbox[1])) // 2 - bbox[1]
+    draw.text((tx, ty), number, font=fnum, fill=(255, 255, 255, 255))
+
+    # Foto profil 1:1 pada area avatar di sisi kiri.
+    if avatar_bytes:
+        avatar = Image.open(BytesIO(avatar_bytes)).convert("RGB")
+        avatar = ImageOps.fit(avatar, (300, 260), centering=(0.5, 0.5))
+        avatar = avatar.resize((round(300 * sx), round(260 * sy)))
+        mask = Image.new("L", avatar.size, 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle(
+            (0, 0, avatar.width - 1, avatar.height - 1),
+            radius=round(22 * sx),
+            fill=255,
+        )
+        image.paste(avatar.convert("RGBA"), xy((89, 247, 389, 507))[:2], mask)
+
+    # Isian utama pada kotak yang sama dengan referensi.
+    cover_field((752, 247, 1437, 300), data.get("name", ""), 23, True)
+    cover_field((752, 316, 1437, 369), f'{data.get("age", "-")} Tahun', 22)
+    cover_field((752, 386, 1437, 438), data.get("domicile", ""), 22)
+    cover_field((752, 457, 1437, 511), data.get("hobby", ""), 22)
+
+    # Informasi tambahan di baris bawah.
+    cover_field((175, 658, 383, 707), data.get("joined_at", "--"), 18, True)
+    cover_field((501, 652, 710, 707), data.get("status", "Warga Aktif"), 17, True)
+    cover_field((839, 652, 1032, 707), data.get("privacy", "Publik"), 17, True)
+    cover_field((1151, 650, 1475, 714), data.get("extra", ""), 15)
+
+    output = BytesIO()
+    image.convert("RGB").save(output, format="PNG", optimize=True)
+    output.seek(0)
+    return output
+
+
+class KIWModal(discord.ui.Modal):
+    def __init__(self, cog, mode="create", existing=None):
+        super().__init__(title="Buat Kartu Identitas" if mode == "create" else "Edit Kartu Identitas")
+        self.cog = cog
+        self.mode = mode
+        existing = existing or {}
+
+        self.name_input = discord.ui.TextInput(
+            label="Nama / Nickname",
+            placeholder="Masukkan nama panggilan kamu...",
+            default=existing.get("name", "") or None,
+            max_length=80,
+            required=True,
+        )
+        self.age_input = discord.ui.TextInput(
+            label="Umur",
+            placeholder="Contoh: 21",
+            default=str(existing.get("age", "")) or None,
+            max_length=3,
+            required=True,
+        )
+        self.domicile_input = discord.ui.TextInput(
+            label="Domisili",
+            placeholder="Contoh: Bandung, Jawa Barat",
+            default=existing.get("domicile", "") or None,
+            max_length=100,
+            required=True,
+        )
+        self.hobby_input = discord.ui.TextInput(
+            label="Hobi",
+            placeholder="Masukkan hobi kamu...",
+            default=existing.get("hobby", "") or None,
+            max_length=120,
+            required=False,
+        )
+        self.extra_input = discord.ui.TextInput(
+            label="Profil Singkat / Tambahan",
+            placeholder="Tuliskan sedikit tentang diri kamu...",
+            default=existing.get("extra", "") or None,
+            style=discord.TextStyle.paragraph,
+            max_length=220,
+            required=False,
+        )
+        for field in (
+            self.name_input, self.age_input, self.domicile_input,
+            self.hobby_input, self.extra_input
+        ):
+            self.add_item(field)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        age_text = self.age_input.value.strip()
+        if not age_text.isdigit() or not 1 <= int(age_text) <= 120:
+            return await interaction.response.send_message(
+                "❌ Umur harus berupa angka antara 1 sampai 120.",
+                ephemeral=True,
+            )
+
+        values = {
+            "name": self.name_input.value.strip(),
+            "age": int(age_text),
+            "domicile": self.domicile_input.value.strip(),
+            "hobby": self.hobby_input.value.strip() or "-",
+            "extra": self.extra_input.value.strip() or "-",
+        }
+        if not values["name"] or not values["domicile"]:
+            return await interaction.response.send_message(
+                "❌ Nama dan domisili wajib diisi.", ephemeral=True
+            )
+        await self.cog.save_kiw(interaction, values, self.mode)
+
+
+class KIWPanelView(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(
+        label="Buat KIW",
+        emoji="🪪",
+        style=discord.ButtonStyle.primary,
+        custom_id="kiw:panel:create",
+    )
+    async def create_kiw(self, interaction: discord.Interaction, button: discord.ui.Button):
+        existing = next(
+            (item for item in kiw_cards()
+             if item.get("guild_id") == str(interaction.guild_id)
+             and item.get("user_id") == str(interaction.user.id)),
+            None,
+        )
+        if existing:
+            return await interaction.response.send_message(
+                "Kamu sudah memiliki KIW. Gunakan tombol Edit pada kartu kamu.",
+                ephemeral=True,
+            )
+        await interaction.response.send_modal(KIWModal(self.cog, "create"))
+
+
+class KIWCardView(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    async def _get_card(self, interaction):
+        return next(
+            (item for item in kiw_cards()
+             if item.get("guild_id") == str(interaction.guild_id)
+             and item.get("message_id") == str(interaction.message.id)),
+            None,
+        )
+
+    @discord.ui.button(
+        label="Buat KIW",
+        emoji="🪪",
+        style=discord.ButtonStyle.primary,
+        custom_id="kiw:card:create",
+    )
+    async def create(self, interaction: discord.Interaction, button: discord.ui.Button):
+        existing = next(
+            (item for item in kiw_cards()
+             if item.get("guild_id") == str(interaction.guild_id)
+             and item.get("user_id") == str(interaction.user.id)),
+            None,
+        )
+        if existing:
+            return await interaction.response.send_message(
+                "Kamu sudah memiliki KIW. Gunakan Edit pada kartu kamu.",
+                ephemeral=True,
+            )
+        await interaction.response.send_modal(KIWModal(self.cog, "create"))
+
+    @discord.ui.button(
+        label="Edit",
+        emoji="✏️",
+        style=discord.ButtonStyle.secondary,
+        custom_id="kiw:card:edit",
+    )
+    async def edit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        card = await self._get_card(interaction)
+        if not card:
+            return await interaction.response.send_message("Data KIW tidak ditemukan.", ephemeral=True)
+        if card.get("user_id") != str(interaction.user.id):
+            return await interaction.response.send_message("Kamu hanya dapat mengedit KIW milikmu sendiri.", ephemeral=True)
+        await interaction.response.send_modal(KIWModal(self.cog, "edit", card))
+
+    @discord.ui.button(
+        label="Hapus",
+        emoji="🗑️",
+        style=discord.ButtonStyle.danger,
+        custom_id="kiw:card:delete",
+    )
+    async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        card = await self._get_card(interaction)
+        if not card:
+            return await interaction.response.send_message("Data KIW tidak ditemukan.", ephemeral=True)
+        if card.get("user_id") != str(interaction.user.id):
+            return await interaction.response.send_message("Kamu hanya dapat menghapus KIW milikmu sendiri.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        data = [item for item in kiw_cards() if item.get("id") != card.get("id")]
+        save_kiw_cards(data)
+
+        if interaction.message:
+            try:
+                await interaction.message.delete()
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+
+        thread_id = card.get("thread_id")
+        if thread_id and interaction.guild:
+            thread = interaction.guild.get_thread(int(thread_id))
+            if thread:
+                try:
+                    await thread.delete(reason="KIW dihapus oleh pemilik kartu")
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
+        await interaction.followup.send("✅ Kartu Identitas Warga berhasil dihapus.", ephemeral=True)
+
+
+
+
 class Automasi(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -846,6 +1151,194 @@ class Automasi(commands.Cog):
 
 
     # =====================================================
+    # SETUP KARTU IDENTITAS WARGA
+    # =====================================================
+
+    @app_commands.command(
+        name="setup-kiw",
+        description="Menyiapkan panel Kartu Identitas Warga",
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.describe(channel="Channel untuk panel Kartu Identitas Warga")
+    async def setup_kiw(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if not interaction.guild:
+            return await interaction.response.send_message(
+                "Gunakan perintah ini di dalam server.", ephemeral=True
+            )
+
+        panel = discord.Embed(
+            title="🪪 Kartu Identitas Warga",
+            description=(
+                "Kenali warga, bangun kebersamaan, dalam satu identitas.\n\n"
+                "Tekan **Buat KIW** untuk mengisi identitas warga Kampung Halaman. "
+                "Setiap warga dapat membuat satu kartu, lalu memperbarui atau "
+                "menghapusnya melalui tombol pada kartu masing-masing."
+            ),
+            color=discord.Color.from_rgb(10, 83, 65),
+        )
+        panel.set_image(url=BANNER_URL)
+        panel.set_footer(text="Pak Tukang | Kartu Identitas Warga")
+
+        try:
+            posted = await channel.send(embed=panel, view=KIWPanelView(self))
+        except discord.Forbidden:
+            return await interaction.response.send_message(
+                "Bot tidak memiliki izin mengirim pesan/embed ke channel tersebut.",
+                ephemeral=True,
+            )
+
+        configs = [
+            item for item in kiw_settings()
+            if item.get("guild_id") != str(interaction.guild_id)
+        ]
+        configs.append({
+            "guild_id": str(interaction.guild_id),
+            "channel_id": str(channel.id),
+            "panel_message_id": str(posted.id),
+        })
+        save_kiw_settings(configs)
+
+        await interaction.response.send_message(
+            f"✅ Panel KIW berhasil disiapkan di {channel.mention}.\n"
+            f"[Lihat panel]({posted.jump_url})",
+            ephemeral=True,
+        )
+
+    async def save_kiw(self, interaction: discord.Interaction, values: dict, mode: str):
+        if not interaction.guild:
+            return await interaction.response.send_message(
+                "Fitur ini hanya dapat digunakan di server.", ephemeral=True
+            )
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        all_cards = kiw_cards()
+        card = next(
+            (item for item in all_cards
+             if item.get("guild_id") == str(interaction.guild_id)
+             and item.get("user_id") == str(interaction.user.id)),
+            None,
+        )
+
+        if mode == "create" and card:
+            return await interaction.followup.send(
+                "Kamu sudah memiliki KIW. Gunakan tombol Edit.", ephemeral=True
+            )
+        if mode == "edit" and not card:
+            return await interaction.followup.send(
+                "KIW kamu belum ditemukan. Buat kartu baru melalui panel.", ephemeral=True
+            )
+
+        cfg = next(
+            (item for item in kiw_settings()
+             if item.get("guild_id") == str(interaction.guild_id)),
+            None,
+        )
+        if not cfg:
+            return await interaction.followup.send(
+                "Panel KIW belum disiapkan administrator dengan `/setup-kiw`.",
+                ephemeral=True,
+            )
+        channel = interaction.guild.get_channel(int(cfg["channel_id"]))
+        if not isinstance(channel, discord.TextChannel):
+            return await interaction.followup.send(
+                "Channel KIW tidak ditemukan. Minta admin menjalankan setup ulang.",
+                ephemeral=True,
+            )
+
+        if card is None:
+            next_number = 1 + max(
+                (int(item.get("number", 0)) for item in all_cards
+                 if item.get("guild_id") == str(interaction.guild_id)),
+                default=0,
+            )
+            card = {
+                "id": uuid.uuid4().hex[:12],
+                "guild_id": str(interaction.guild_id),
+                "user_id": str(interaction.user.id),
+                "number": next_number,
+                "card_number": f"KH-{next_number:05d}",
+                "message_id": None,
+                "thread_id": None,
+                "joined_at": datetime.now().strftime("%d-%m-%Y"),
+                "status": "Warga Aktif",
+                "privacy": "Publik",
+            }
+
+        card.update(values)
+        card["display_name"] = interaction.user.display_name
+        card["avatar_url"] = interaction.user.display_avatar.url
+
+        try:
+            # Avatar Discord dapat gagal diambil (misalnya asset 404).
+            # Jika gagal, renderer tetap memakai placeholder pada template.
+            avatar_bytes = None
+            try:
+                avatar_bytes = await interaction.user.display_avatar.with_size(512).read()
+            except (discord.NotFound, discord.HTTPException) as avatar_error:
+                print(f"[KIW] Avatar tidak tersedia, memakai placeholder: {avatar_error}")
+
+            image_buffer = await asyncio.to_thread(
+                render_kiw, card, avatar_bytes
+            )
+        except ImportError:
+            return await interaction.followup.send(
+                "Library Pillow belum terpasang. Jalankan `pip install Pillow`.",
+                ephemeral=True,
+            )
+        except Exception as exc:
+            return await interaction.followup.send(
+                f"Gagal membuat gambar KIW: `{type(exc).__name__}: {exc}`",
+                ephemeral=True,
+            )
+
+        file = discord.File(image_buffer, filename="kiw.png")
+        embed = discord.Embed(
+            description=f"🪪 **Kartu Identitas Warga** • {interaction.user.mention}",
+            color=discord.Color.from_rgb(10, 83, 65),
+        )
+        embed.set_image(url="attachment://kiw.png")
+
+        try:
+            if card.get("message_id"):
+                try:
+                    message = await channel.fetch_message(int(card["message_id"]))
+                    await message.edit(embed=embed, attachments=[file], view=KIWCardView(self))
+                except discord.NotFound:
+                    card["message_id"] = None
+
+            if not card.get("message_id"):
+                message = await channel.send(embed=embed, file=file, view=KIWCardView(self))
+                card["message_id"] = str(message.id)
+                thread = await message.create_thread(
+                    name=KIW_THREAD_NAME,
+                    auto_archive_duration=1440,
+                    reason="Kolom komentar Kartu Identitas Warga",
+                )
+                card["thread_id"] = str(thread.id)
+        except discord.Forbidden:
+            return await interaction.followup.send(
+                "Bot tidak memiliki izin mengirim/mengedit pesan atau membuat thread. "
+                "Periksa Send Messages, Embed Links, Attach Files, Create Public Threads, "
+                "dan Send Messages in Threads.",
+                ephemeral=True,
+            )
+        except discord.HTTPException as exc:
+            return await interaction.followup.send(
+                f"Discord gagal memproses kartu: `{exc}`", ephemeral=True
+            )
+
+        if not any(item.get("id") == card["id"] for item in all_cards):
+            all_cards.append(card)
+        save_kiw_cards(all_cards)
+        await interaction.followup.send(
+            ("✅ KIW berhasil dibuat." if mode == "create" else "✅ KIW berhasil diperbarui.")
+            + f"\n🪪 Nomor: **{card['card_number']}**\n"
+            + f"📨 [Lihat kartu]({message.jump_url})",
+            ephemeral=True,
+        )
+
+
+    # =====================================================
     # LISTENER AUTOTHREAD
     # =====================================================
 
@@ -900,16 +1393,23 @@ class Automasi(commands.Cog):
 # =========================================================
 
 async def setup(bot: commands.Bot):
-    # Registrasi persistent views.
-    bot.add_view(SaranView())
+    # Buat Cog sebelum membuat view yang membutuhkan instance Automasi.
     automasi_cog = Automasi(bot)
+
+    # Persistent views untuk tombol yang sudah terpasang di Discord.
+    bot.add_view(SaranView())
+    bot.add_view(KIWPanelView(automasi_cog))
+    bot.add_view(KIWCardView(automasi_cog))
     bot.add_view(MutualPanelView(automasi_cog))
+
+    # Pulihkan tombol pada profil Mutualan yang tersimpan.
     for profile in mutual_profiles():
         if profile.get("message_id"):
             bot.add_view(
                 MutualProfileView(automasi_cog, profile),
                 message_id=int(profile["message_id"]),
             )
+
     await bot.add_cog(automasi_cog)
     await bot.add_cog(Feed(bot))
 

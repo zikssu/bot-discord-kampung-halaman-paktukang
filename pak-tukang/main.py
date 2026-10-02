@@ -17,7 +17,7 @@ class PakTukang(commands.Bot):
             await self.tree.sync(guild=guild)
         else:
             await self.tree.sync()
-bot=PakTukang(command_prefix="!", intents=intents)
+bot=PakTukang(command_prefix="p!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"Pak Tukang online sebagai {bot.user}")
